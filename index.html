@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>covid19.dyeoh.com</title>
+	<meta name="title" content="covid19.dyeoh.com">
+	<meta name="description" content="covid19's stats (with speed and acceleration)">
+	<meta name="author" content="Desmond Yeoh">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta property="og:site_name" content="covid19.dyeoh.com">
+	<meta property="og:title" content="covid19.dyeoh.com" />
+	<meta property="og:description" content="covid19's stats (with speed and acceleration)" />
+	<meta property="og:image" content="https://cdn.pixabay.com/photo/2020/04/02/19/11/covid-19-4996393_960_720.png" />
+	<meta property="og:type" content="website" />
+	<style type="text/css">
+		* {
+			font-family: arial;
+		}
+		hr {
+		    height: 1px;
+		    color: #eee;
+		    background-color: #eee;
+		    margin: 40px 0;
+		    border: none;
+		}
+	</style>
+</head>
+<body><center>
+	<h1>covid19.dyeoh.com</h1>
+	<p>
+		COVID19's stats (with speed and acceleration)<br/>
+		Current country: <strong><span id="current-country"></span></strong>
+	</p>
+	<select id="select-country">
+		<option value="">Select another country</option>
+	</select>
+	<p><small>Data source: <a href="https://github.com/CSSEGISandData/COVID-19">CSSEGISandData/COVID-19</a></small></p>
+	<hr>
+	
+
+	<h2>Cumulative cases (y)</h2>
+	<div id="chart-y" style="width: 100vw; height:400px"></div>
+	<hr>
+
+	<h2>Speed of cases (dy/dt)</h2>
+	<div id="chart-dydt" style="width: 100vw; height:400px"></div>
+	<hr>
+
+	<h2>Acceleration of cases (d2y/dt2)</h2>
+	<div id="chart-d2ydt2" style="width: 100vw; height:400px"></div>
+
+	<!-- Scripts -->
+	<script
+	  src="https://code.jquery.com/jquery-3.4.1.min.js"
+	  integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+	  crossorigin="anonymous"></script>
+	<script src="https://cdn.jsdelivr.net/npm/echarts@4.7.0/dist/echarts.min.js"></script>
+	<script type="text/javascript">
+	let DATE_LIST = [];
+	let Y_CONFIRMED_LIST = [];
+	let Y_RECOVERED_LIST = [];
+	let Y_DEATHS_LIST = [];
+	let DYDT_CONFIRMED_LIST = [];
+	let DYDT_RECOVERED_LIST = [];
+	let DYDT_DEATHS_LIST = [];
+	let D2YDT2_CONFIRMED_LIST = [];
+	let D2YDT2_RECOVERED_LIST = [];
+	let D2YDT2_DEATHS_LIST = [];
+
+	const TXT = {
+		Y_CHART_TITLE: 'Yative Statistics',
+		CONFIRMED: 'CONFIRMED',
+		RECOVERED: 'RECOVERED',
+		DEATHS: 'DEATHS',
+	}
+
+	function fetchData(country) {
+		DATE_LIST = [];
+		Y_CONFIRMED_LIST = [];
+		Y_RECOVERED_LIST = [];
+		Y_DEATHS_LIST = [];
+		DYDT_CONFIRMED_LIST = [];
+		DYDT_RECOVERED_LIST = [];
+		DYDT_DEATHS_LIST = [];
+		D2YDT2_CONFIRMED_LIST = [];
+		D2YDT2_RECOVERED_LIST = [];
+		D2YDT2_DEATHS_LIST = [];
+		fetch("https://pomber.github.io/covid19/timeseries.json")
+			.then(response => response.json())
+			.then(data => {
+				Object.keys(data).forEach( country => {
+					let sel = document.getElementById('select-country');
+					let opt = document.createElement('option');
+					opt.appendChild( document.createTextNode(country) );
+					opt.value = country;
+					sel.appendChild(opt);
+				});
+				data[country].forEach(({ date, confirmed, recovered, deaths }) => {
+
+					DATE_LIST.push(date);
+					Y_CONFIRMED_LIST.push(confirmed);
+					Y_RECOVERED_LIST.push(recovered);
+					Y_DEATHS_LIST.push(deaths);
+
+				});
+
+				DYDT_CONFIRMED_LIST = calcDerivative(Y_CONFIRMED_LIST);
+				DYDT_RECOVERED_LIST = calcDerivative(Y_RECOVERED_LIST);
+				DYDT_DEATHS_LIST = calcDerivative(Y_DEATHS_LIST);
+
+				D2YDT2_CONFIRMED_LIST = calcDerivative(DYDT_CONFIRMED_LIST);
+				D2YDT2_RECOVERED_LIST = calcDerivative(DYDT_RECOVERED_LIST);
+				D2YDT2_DEATHS_LIST = calcDerivative(DYDT_DEATHS_LIST);
+
+				drawChart(
+					chartId='chart-y',
+					chartSeriesList=[Y_CONFIRMED_LIST, Y_RECOVERED_LIST, Y_DEATHS_LIST],
+					chartType='bar'
+				);
+				drawChart(
+					chartId='chart-dydt',
+					chartSeriesList=[DYDT_CONFIRMED_LIST, DYDT_RECOVERED_LIST, DYDT_DEATHS_LIST],
+					chartType='bar'
+				);
+				drawChart(
+					chartId='chart-d2ydt2',
+					chartSeriesList=[D2YDT2_CONFIRMED_LIST, D2YDT2_RECOVERED_LIST, D2YDT2_DEATHS_LIST],
+					chartType='bar'
+				);
+		});
+	}
+
+	function calcDerivative(list) {
+		derivedList = [0]
+		for (let i = 1; i < list.length; i++) {
+			derivedList.push(list[i] - list[i-1]);
+		}
+		return derivedList;
+	}
+
+	function drawChart(chartId, chartSeriesList, chartType) {
+
+		var myChart = echarts.init(document.getElementById(chartId));
+
+        var option = {
+            tooltip: {},
+            legend: {
+                data:[TXT.CONFIRMED, TXT.RECOVERED, TXT.DEATHS]
+            },
+            xAxis: {
+                data: DATE_LIST,
+            },
+            yAxis: {
+            },
+            series: [
+            	{
+	                name: TXT.CONFIRMED,
+	                type: chartType,
+	                data: chartSeriesList[0],
+	            },
+	            {
+	                name: TXT.RECOVERED,
+	                type: chartType,
+	                data: chartSeriesList[1],
+	            },
+	            {
+	                name: TXT.DEATHS,
+	                type: chartType,
+	                data: chartSeriesList[2],
+	            }
+            ]
+        };
+
+        myChart.setOption(option);
+	}
+
+	function insertParam(key, value)
+	{
+	    key = encodeURI(key); value = encodeURI(value);
+
+	    var kvp = document.location.search.substr(1).split('&');
+
+	    var i=kvp.length; var x; while(i--) 
+	    {
+	        x = kvp[i].split('=');
+
+	        if (x[0]==key)
+	        {
+	            x[1] = value;
+	            kvp[i] = x.join('=');
+	            break;
+	        }
+	    }
+
+	    if(i<0) {kvp[kvp.length] = [key,value].join('=');}
+
+	    //this will reload the page, it's likely better to store this until finished
+	    document.location.search = kvp.join('&'); 
+	}
+
+	$(document).ready(function() {
+		// check for URL param
+		const urlParams = new URLSearchParams(window.location.search);
+		let paramCountry = urlParams.get('country');
+		if (paramCountry === null) {
+			paramCountry = 'Malaysia';
+		}
+
+		$('#current-country').text(paramCountry);
+		fetchData(paramCountry);
+
+		$('#select-country').change(function () {
+			let paramCountry = $(this).val();
+			if (paramCountry === '') return;
+
+			insertParam('country', paramCountry);
+			$('#current-country').text(paramCountry);
+			fetchData(paramCountry);
+		});
+	})
+	</script>
+	</script>
+</center></body>
+</html>
